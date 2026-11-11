@@ -98,17 +98,7 @@ function publicPage() {
   <h1 id="name">…</h1>
   <div class="meta"><span id="ver"></span><span id="size"></span></div>
   <a class="btn" id="install" href="#">Cài đặt</a>
-  <div class="row">
-    <input id="key" placeholder="Key" autocomplete="off" spellcheck="false">
-    <button class="btn ghost" id="act">Kích hoạt</button>
-  </div>
-  <div class="kv" id="info" hidden>
-    <div><span>Tên thiết bị</span><b id="dname">—</b></div>
-    <div><span>ID thiết bị</span><b id="did" class="mono">—</b></div>
-    <div><span>Hạn dùng</span><b id="dexp">—</b></div>
-    <div><span>Còn lại</span><b id="dleft">—</b></div>
-  </div>
-  <div class="line" id="msg"></div>
+  <div class="line" id="msg">Mở app và nhập key sau khi cài</div>
 </main>
 <script>
 const slug = location.pathname.split('/').pop();
@@ -125,36 +115,6 @@ const $ = id => document.getElementById(id);
   else { $('install').classList.add('off'); $('install').textContent = 'Chưa có gói'; }
 })();
 
-const showInfo = (name, id, exp, days) => {
-  $('info').hidden = false;
-  $('dname').textContent = name || '—';
-  $('did').textContent = id ? id.slice(0, 18) + (id.length > 18 ? '…' : '') : '—';
-  $('dexp').textContent = exp ? new Date(exp).toLocaleDateString('vi-VN') : '—';
-  $('dleft').textContent = days != null ? days + ' ngày' : '—';
-};
-$('act').onclick = async () => {
-  const key = $('key').value.trim().toUpperCase();
-  if (!key) return;
-  let udid = localStorage.getItem('camkey_udid');
-  if (!udid) {
-    udid = prompt('UDID') || '';
-    if (!udid) return;
-    localStorage.setItem('camkey_udid', udid.trim());
-  }
-  let name = localStorage.getItem('camkey_name');
-  if (!name) name = prompt('Tên thiết bị (vd: iPhone 15 Pro Max)') || '';
-  if (name) localStorage.setItem('camkey_name', name);
-  const r = await fetch('/api/v1/public/redeem', {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ key, udid, name })
-  }).then(r => r.json());
-  $('msg').textContent = r.message;
-  if (r.ok) {
-    $('act').textContent = 'OK';
-    $('act').disabled = true;
-    showInfo(r.deviceName || name, udid, r.expiresAt, r.days);
-  }
-};
 </script></body></html>`;
 }
 

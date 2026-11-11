@@ -21,7 +21,7 @@ final class AppState: ObservableObject {
 
     init() {
         let d = UserDefaults.standard
-        server = d.string(forKey: "server") ?? "http://192.168.1.10:8787"
+        server = d.string(forKey: "server") ?? "https://timeline-fewer-drawing-italiano.trycloudflare.com"
         key = d.string(forKey: "key") ?? ""
         expiresAt = d.double(forKey: "expiresAt")
         deviceName = d.string(forKey: "deviceName") ?? Device.name
@@ -241,6 +241,7 @@ struct PlayerView: View {
                     Text(stream.state).font(.footnote).foregroundStyle(.white.opacity(0.9))
                     Spacer()
                     Text("\(app.daysLeft)d").font(.caption.monospaced()).foregroundStyle(.white.opacity(0.8))
+                    Button { editURL.toggle() } label: { Image(systemName: "antenna.radiowaves.left.and.right").foregroundStyle(.white) }
                     Button { sheet = true } label: { Image(systemName: "info.circle.fill").foregroundStyle(.white) }
                 }
                 .padding(12)
@@ -267,7 +268,6 @@ struct PlayerView: View {
         }
         .onAppear { stream.connect() }
         .onDisappear { stream.stop() }
-        .onLongPressGesture { editURL.toggle() }
         .sheet(isPresented: $sheet) {
             InfoView(app: app, streamURL: stream.urlText)
                 .presentationDetents([.medium])

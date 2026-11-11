@@ -41,6 +41,8 @@ jobs:
       - name: Theos
         run: |
           git clone --recursive https://github.com/theos/theos.git $HOME/theos
+      - name: Dependencies
+        run: brew install ldid make
       - name: Build deb
         working-directory: ios/ObsCamTweak
         run: |

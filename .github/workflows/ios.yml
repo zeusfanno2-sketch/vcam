@@ -1,0 +1,52 @@
+name: ios
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+
+jobs:
+  app:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: XcodeGen
+        run: brew install xcodegen
+      - name: Generate project
+        working-directory: ios/ObsCam
+        run: xcodegen generate
+      - name: Build (unsigned)
+        working-directory: ios/ObsCam
+        run: |
+          xcodebuild -project ObsCam.xcodeproj -scheme ObsCam \
+            -configuration Release -sdk iphoneos -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
+      - name: Package IPA
+        working-directory: ios/ObsCam
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/ObsCam.app Payload/
+          zip -qr ObsCam-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ObsCam-unsigned-ipa
+          path: ios/ObsCam/ObsCam-unsigned.ipa
+
+  tweak:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Theos
+        run: |
+          git clone --recursive https://github.com/theos/theos.git $HOME/theos
+      - name: Build deb
+        working-directory: ios/ObsCamTweak
+        run: |
+          export THEOS=$HOME/theos
+          make package FINALPACKAGE=1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ObsCamTweak-deb
+          path: ios/ObsCamTweak/packages/*.deb

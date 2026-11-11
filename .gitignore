@@ -1,0 +1,7 @@
+node_modules/
+data.json
+infra/mediamtx/
+infra/mediamtx.zip
+*.ipa
+*.deb
+.DS_Store

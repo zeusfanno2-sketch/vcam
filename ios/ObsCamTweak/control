@@ -1,0 +1,9 @@
+Package: com.camkey.obscamtweak
+Name: ObsCam
+Depends: mobilesubstrate
+Version: 1.0.0
+Architecture: iphoneos-arm
+Description: Thay camera app dich bang luong HLS tu OBS/MediaMTX
+Maintainer: camkey
+Author: camkey
+Section: Tweaks

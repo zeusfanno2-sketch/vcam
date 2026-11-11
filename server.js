@@ -33,11 +33,23 @@ function load() {
   return JSON.parse(fs.readFileSync(DATA, 'utf8'));
 }
 let db = load();
+let dbMtime = 0;
+try { dbMtime = fs.statSync(DATA).mtimeMs; } catch {}
+function reloadIfChanged() {
+  try {
+    const m = fs.statSync(DATA).mtimeMs;
+    if (m > dbMtime + 1) {
+      db = JSON.parse(fs.readFileSync(DATA, 'utf8'));
+      dbMtime = m;
+    }
+  } catch {}
+}
 const save = () => {
   const tmp = DATA + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(db, null, 2));
   try { if (fs.existsSync(DATA)) fs.copyFileSync(DATA, DATA + '.bak'); } catch {}
   fs.renameSync(tmp, DATA);
+  try { dbMtime = fs.statSync(DATA).mtimeMs; } catch {}
 };
 
 function newKey() {
@@ -422,6 +434,7 @@ const server = http.createServer(async (req, res) => {
   }
   if (p === '/api/v1/admin/keys' && req.method === 'POST') {
     if (!authed(req)) return json(res, 401, { ok: false });
+    reloadIfChanged();
     const b = await readBody(req);
     const count = Math.max(1, Math.min(500, Number(b.count) || 1));
     const days = Math.max(1, Math.min(3650, Number(b.days) || 30));
@@ -437,6 +450,7 @@ const server = http.createServer(async (req, res) => {
   }
   if (p.startsWith('/api/v1/admin/keys/') && req.method === 'DELETE') {
     if (!authed(req)) return json(res, 401, { ok: false });
+    reloadIfChanged();
     const key = decodeURIComponent(p.split('/').pop());
     const k = findKey(key);
     if (!k) return json(res, 404, { ok: false });
@@ -502,6 +516,7 @@ const server = http.createServer(async (req, res) => {
 
   if (p === '/api/v1/public/redeem' && req.method === 'POST') {
     const b = await readBody(req);
+    reloadIfChanged();
     const k = findKey(b.key);
     const udid = String(b.udid || '').trim();
     if (!k) return json(res, 404, { ok: false, message: 'Key không tồn tại' });

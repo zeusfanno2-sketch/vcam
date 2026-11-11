@@ -172,7 +172,7 @@ function adminPage(authedNow) {
   <section class="card">
     <div class="row between"><b>Key</b><input id="search" placeholder="Tìm key / UDID"></div>
     <div class="tablewrap">
-    <table id="tbl"><thead><tr><th>Key</th><th>Trạng thái</th><th class="col-udid">UDID</th><th>Hết hạn</th><th></th></tr></thead><tbody></tbody></table>
+    <table id="tbl"><thead><tr><th>Key</th><th>Trạng thái</th><th>Số ngày</th><th>Ngày hết hạn</th><th class="col-udid">UDID</th><th></th></tr></thead><tbody></tbody></table>
     </div>
   </section>
 
@@ -219,7 +219,7 @@ async function refresh() {
   if (!r.ok) return;
   const q = $('search').value.toLowerCase();
   const rows = r.keys.filter(k => !q || k.key.toLowerCase().includes(q) || (k.udid || '').toLowerCase().includes(q));
-  $('tbl').tBodies[0].innerHTML = rows.map(k => '<tr><td class="mono">' + k.key + '</td><td>' + badge(k.state) + '</td><td class="mono muted col-udid">' + (k.udid ? k.udid.slice(0, 16) + '…' : '—') + '</td><td class="nowrap">' + fmt(k.expiresAt) + '</td><td class="right nowrap"><button class="btn tiny ghost" data-copy="' + k.key + '">Copy</button> ' + (k.state === 'revoked' ? '' : '<button class="btn tiny warn" data-rev="' + k.key + '">Thu hồi</button> ') + '<button class="btn tiny danger" data-del="' + k.key + '">Xóa</button></td></tr>').join('');
+  $('tbl').tBodies[0].innerHTML = rows.map(k => '<tr><td class="mono">' + k.key + '</td><td>' + badge(k.state) + '</td><td class="nowrap">' + (k.days || '—') + '</td><td class="nowrap">' + fmt(k.expiresAt) + '</td><td class="mono muted col-udid">' + (k.udid ? k.udid.slice(0, 16) + '…' : '—') + '</td><td class="right nowrap"><button class="btn tiny ghost" data-copy="' + k.key + '">Copy</button> ' + (k.state === 'revoked' ? '' : '<button class="btn tiny warn" data-rev="' + k.key + '">Thu hồi</button> ') + '<button class="btn tiny danger" data-del="' + k.key + '">Xóa</button></td></tr>').join('');
   const s = r.stats;
   $('stat').textContent = s.total + ' key · ' + s.active + ' active · ' + s.unused + ' chưa dùng';
 }
@@ -281,7 +281,7 @@ const CSS = `
 html,body{margin:0;height:100%}
 body{background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 .center{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
-.wrap{max-width:1220px;margin:0 auto;padding:20px;display:flex;flex-direction:column;gap:14px}
+.wrap{width:100%;max-width:none;margin:0 auto;padding:20px;display:flex;flex-direction:column;gap:14px}
 header{display:flex;align-items:center;gap:10px}
 .grow{flex:1}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
@@ -304,6 +304,8 @@ input:focus{outline:none;border-color:var(--acc)}
 .right{text-align:right}
 .line{font-size:12px;color:var(--mut);min-height:16px;text-align:center}
 table{width:100%;border-collapse:collapse;font-size:13px;table-layout:auto}
+#tbl td:first-child,#tbl th:first-child{width:190px}
+#tbl td:last-child,#tbl th:last-child{width:230px;text-align:right}
 th{text-align:left;color:var(--mut);font-weight:500;font-size:12px;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
 td{padding:10px;border-bottom:1px solid #1b2130;white-space:nowrap}
 .nowrap{white-space:nowrap}
@@ -329,6 +331,20 @@ const server = http.createServer(async (req, res) => {
   const p = url.pathname;
 
   if (req.method === 'OPTIONS') return json(res, 204, {});
+
+  if (p.startsWith('/files/')) {
+    const name = path.basename(decodeURIComponent(p.slice(7)));
+    const file = path.join(ROOT, 'dist', name);
+    if (!fs.existsSync(file)) { res.writeHead(404); return res.end('not found'); }
+    const stat = fs.statSync(file);
+    res.writeHead(200, {
+      'content-type': 'application/octet-stream',
+      'content-length': stat.size,
+      'content-disposition': 'attachment; filename="' + name + '"',
+      'cache-control': 'no-store'
+    });
+    return fs.createReadStream(file).pipe(res);
+  }
 
   if (p === '/style.css') {
     res.writeHead(200, { 'content-type': 'text/css; charset=utf-8', 'cache-control': 'max-age=3600' });

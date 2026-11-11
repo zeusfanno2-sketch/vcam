@@ -115,6 +115,7 @@ function publicPage() {
   <h1 id="name">…</h1>
   <div class="meta"><span id="ver"></span><span id="size"></span></div>
   <a class="btn" id="install" href="#">Cài đặt</a>
+  ${fs.existsSync(path.join(ROOT, 'dist', 'app-debug.apk')) ? '<a class="btn ghost" href="/files/app-debug.apk">Tải APK (Android)</a>' : ''}
   <div class="line" id="msg">Mở app và nhập key sau khi cài</div>
 </main>
 <script>

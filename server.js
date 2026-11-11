@@ -81,8 +81,17 @@ function readBody(req) {
 }
 function authed(req) {
   const h = String(req.headers.authorization || '');
-  const t = h.replace(/^Bearer\s+/i, '');
+  const bearer = h.replace(/^Bearer\s+/i, '');
+  const ck = String(req.headers.cookie || '').match(/(?:^|;\s*)ck=([a-f0-9]+)/);
+  const t = bearer || (ck ? ck[1] : '');
   return db.sessions.find(s => s.token === t && s.exp > now());
+}
+function formBody(req) {
+  return new Promise((resolve) => {
+    let s = '';
+    req.on('data', (c) => { s += c; if (s.length > 1e5) req.destroy(); });
+    req.on('end', () => resolve(new URLSearchParams(s)));
+  });
 }
 
 /* ---------- public pages ---------- */
@@ -126,10 +135,10 @@ function adminPage() {
 <title>CAMKEY</title><link rel="stylesheet" href="/style.css"></head>
 <body>
 <div id="login" class="center">
-  <form class="card narrow" id="lform">
+  <form class="card narrow" method="post" action="/keys">
     <h1>CAMKEY</h1>
-    <input id="pw" type="password" placeholder="Mật khẩu" autocomplete="current-password">
-    <button class="btn">Đăng nhập</button>
+    <input id="pw" name="password" type="password" placeholder="Mật khẩu" autocomplete="current-password">
+    <button class="btn" type="submit">Đăng nhập</button>
     <div class="line" id="lerr"></div>
   </form>
 </div>
@@ -180,6 +189,8 @@ function adminPage() {
 const $ = id => document.getElementById(id);
 let T = localStorage.getItem('camkey_token') || '';
 
+if (location.search.indexOf('e=1') >= 0) { $('lerr').textContent = 'Sai mật khẩu'; }
+
 const api = async (p, o = {}) => {
   const r = await fetch('/api/v1' + p, {
     ...o,
@@ -188,15 +199,7 @@ const api = async (p, o = {}) => {
   return r.json();
 };
 
-$('lform').onsubmit = async (e) => {
-  e.preventDefault();
-  const r = await api('/auth/login', { method: 'POST', body: JSON.stringify({ password: $('pw').value }) });
-  if (!r.ok) { $('lerr').textContent = 'Sai mật khẩu'; return; }
-  T = r.token; localStorage.setItem('camkey_token', T);
-  boot();
-};
-
-$('out').onclick = async () => { await api('/auth/logout', { method: 'POST' }); localStorage.removeItem('camkey_token'); location.reload(); };
+$('out').onclick = async () => { localStorage.removeItem('camkey_token'); location.href = '/logout'; };
 
 function fmt(t) { if (!t) return '—'; const d = new Date(t); return d.toLocaleDateString('vi-VN') + ' ' + d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }); }
 const badge = s => '<span class="badge ' + s + '">' + ({ unused: 'Chưa dùng', active: 'Hoạt động', expired: 'Hết hạn', revoked: 'Thu hồi' }[s] || s) + '</span>';
@@ -316,8 +319,33 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'content-type': 'text/css; charset=utf-8', 'cache-control': 'max-age=3600' });
     return res.end(CSS);
   }
-  if (p === '/' || p === '/admin' || p === '/keys') return html(res, 200, adminPage());
+  if (p === '/' || p === '/admin' || p === '/keys') {
+    if (req.method === 'POST') {
+      const body = await formBody(req);
+      if (String(body.get('password') || '') !== ADMIN_PASSWORD) {
+        res.writeHead(302, { location: '/keys?e=1' });
+        return res.end();
+      }
+      const t = token();
+      db.sessions = db.sessions.filter(s => s.exp > now());
+      db.sessions.push({ token: t, exp: now() + 7 * 864e5 });
+      save();
+      res.writeHead(302, {
+        location: '/keys',
+        'set-cookie': `ck=${t}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800`
+      });
+      return res.end();
+    }
+    return html(res, 200, adminPage());
+  }
   if (p.startsWith('/p/')) return html(res, 200, publicPage());
+
+  if (p === '/logout') {
+    const ck = String(req.headers.cookie || '').match(/(?:^|;\s*)ck=([a-f0-9]+)/);
+    if (ck) { db.sessions = db.sessions.filter(s => s.token !== ck[1]); save(); }
+    res.writeHead(302, { location: '/keys', 'set-cookie': 'ck=; Path=/; Max-Age=0' });
+    return res.end();
+  }
 
   if (p === '/api/v1/auth/login' && req.method === 'POST') {
     const b = await readBody(req);

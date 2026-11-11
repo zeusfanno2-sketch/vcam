@@ -7,3 +7,4 @@ infra/mediamtx.zip
 .DS_Store
 infra/cloudflared.exe
 dist/
+tools/

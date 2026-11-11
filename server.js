@@ -52,7 +52,10 @@ function pubKey(k) {
   return {
     key: k.key, note: k.note || '', udid: k.udid || null,
     createdAt: k.createdAt, activatedAt: k.activatedAt || null,
-    expiresAt: k.expiresAt || null, state: keyState(k)
+    days: k.days || null,
+    expiresAt: k.expiresAt || (k.createdAt + (k.days || 0) * 864e5),
+    activated: !!k.udid,
+    state: keyState(k)
   };
 }
 function findKey(s) { return db.keys.find(k => k.key === String(s || '').toUpperCase().trim()); }

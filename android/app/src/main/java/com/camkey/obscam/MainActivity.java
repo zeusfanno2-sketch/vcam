@@ -41,7 +41,8 @@ import java.util.concurrent.Executors;
 @OptIn(markerClass = UnstableApi.class)
 public class MainActivity extends AppCompatActivity {
 
-    private static final String DEFAULT_SERVER = "https://ranch-complicated-commander-pink.trycloudflare.com";
+    private static final String DEFAULT_SERVER = "https://alternatives-polar-consultant-meyer.trycloudflare.com";
+    private static final String BOOTSTRAP = "https://raw.githubusercontent.com/zeusfanno2-sketch/vcam/main/server.txt";
     private static final String DEFAULT_STREAM = "http://192.168.1.10:8888/live/test/index.m3u8";
 
     private SharedPreferences prefs;
@@ -70,6 +71,8 @@ public class MainActivity extends AppCompatActivity {
         root.setBackgroundColor(Color.BLACK);
         setContentView(root, new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        bootstrapAsync();
 
         if (!key.isEmpty() && expiresAt > System.currentTimeMillis()) {
             showPlayer();
@@ -102,6 +105,25 @@ public class MainActivity extends AppCompatActivity {
         if (expiresAt <= 0) return 0;
         long d = (expiresAt - System.currentTimeMillis()) / 86400000L;
         return (int) Math.max(0, Math.ceil(d));
+    }
+
+    // ---------- bootstrap ----------
+
+    private void bootstrapAsync() {
+        io.execute(() -> {
+            try {
+                HttpURLConnection c = (HttpURLConnection) new URL(BOOTSTRAP).openConnection();
+                c.setConnectTimeout(8000);
+                c.setReadTimeout(8000);
+                BufferedReader r = new BufferedReader(new InputStreamReader(c.getInputStream(), "UTF-8"));
+                String line = r.readLine();
+                r.close();
+                if (line != null && line.trim().startsWith("http")) {
+                    server = line.trim();
+                    prefs.edit().putString("server", server).apply();
+                }
+            } catch (Exception ignored) { }
+        });
     }
 
     // ---------- gate ----------

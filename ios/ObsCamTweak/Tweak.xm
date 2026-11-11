@@ -1,5 +1,4 @@
-// ObsCamTweak — OBS/MediaMTX HLS -> camera feed
-// Hook: AVCaptureVideoDataOutput sample buffer delegate
+// ObsCamTweak — OBS/MediaMTX HLS -> camera feed (system-wide) + toggle + key
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import <AVFoundation/AVFoundation.h>
@@ -7,15 +6,60 @@
 #import <CoreVideo/CoreVideo.h>
 
 static NSString *const kPrefDomain = @"com.camkey.obscamtweak";
-static NSString *const kPrefKey = @"streamURL";
 static NSString *const kFallbackURL = @"http://192.168.1.10:8888/live/test/index.m3u8";
+static NSString *const kFallbackServer = @"https://xml-buying-jvc-intro.trycloudflare.com";
 
-static NSString *CKStreamURL(void) {
-    CFPropertyListRef v = CFPreferencesCopyAppValue((__bridge CFStringRef)kPrefKey,
+static BOOL gEnabled = YES;
+static BOOL gKeyValid = YES;
+
+static NSString *CKPref(NSString *key, NSString *fallback) {
+    CFPropertyListRef v = CFPreferencesCopyAppValue((__bridge CFStringRef)key,
                                                     (__bridge CFStringRef)kPrefDomain);
     NSString *s = v ? (__bridge_transfer NSString *)v : nil;
-    if (s.length < 8) s = kFallbackURL;
-    return s;
+    return (s && s.length) ? s : fallback;
+}
+
+static void CKSetPref(NSString *key, id value) {
+    CFPreferencesSetAppValue((__bridge CFStringRef)key, (__bridge CFPropertyListRef)value,
+                             (__bridge CFStringRef)kPrefDomain);
+    CFPreferencesAppSynchronize((__bridge CFStringRef)kPrefDomain);
+}
+
+static NSString *CKStreamURL(void) { return CKPref(@"streamURL", kFallbackURL); }
+static NSString *CKServer(void) { return CKPref(@"server", kFallbackServer); }
+static NSString *CKKey(void) { return CKPref(@"key", @""); }
+static NSString *CKDeviceID(void) {
+    return [[[UIDevice currentDevice] identifierForVendor] UUIDString] ?: @"unknown";
+}
+
+static void CKCheckKey(void) {
+    NSString *key = CKKey();
+    if (key.length < 8) { gKeyValid = NO; return; }
+
+    NSString *base = CKServer();
+    if ([base hasSuffix:@"/"]) base = [base substringToIndex:base.length - 1];
+    NSURL *url = [NSURL URLWithString:[base stringByAppendingString:@"/api/v1/public/check"]];
+    if (!url) { gKeyValid = NO; return; }
+
+    NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:url];
+    req.HTTPMethod = @"POST";
+    [req setValue:@"application/json" forHTTPHeaderField:@"content-type"];
+    req.timeoutInterval = 10;
+    NSDictionary *body = @{@"key": key, @"udid": CKDeviceID()};
+    req.HTTPBody = [NSJSONSerialization dataWithJSONObject:body options:0 error:nil];
+
+    NSURLSessionDataTask *task = [[NSURLSession sharedSession] dataTaskWithRequest:req
+        completionHandler:^(NSData *data, NSURLResponse *resp, NSError *err) {
+            if (!data) return;
+            NSDictionary *obj = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+            BOOL valid = [obj[@"valid"] boolValue];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                gKeyValid = valid;
+                CKSetPref(@"keyValid", @(valid));
+                if (!valid) gEnabled = NO;
+            });
+        }];
+    [task resume];
 }
 
 #pragma mark - frame source
@@ -46,7 +90,6 @@ static NSString *CKStreamURL(void) {
         (id)kCVPixelBufferIOSurfacePropertiesKey: @{}
     };
     self.output = [[AVPlayerItemVideoOutput alloc] initWithPixelBufferAttributes:attrs];
-    self.output.suppressesPlayerRendering = NO;
 
     NSURL *url = [NSURL URLWithString:CKStreamURL()];
     AVURLAsset *asset = [AVURLAsset URLAssetWithURL:url options:@{
@@ -55,8 +98,6 @@ static NSString *CKStreamURL(void) {
     AVPlayerItem *item = [AVPlayerItem playerItemWithAsset:asset];
     item.preferredForwardBufferDuration = 0.2;
     item.canUseNetworkResourcesForLiveStreamingWhilePaused = YES;
-    if ([item respondsToSelector:@selector(setPreferredPeakBitRate:)]) item.preferredPeakBitRate = 0;
-
     [item addOutput:self.output];
 
     self.player = [AVPlayer playerWithPlayerItem:item];
@@ -98,7 +139,7 @@ static NSString *CKStreamURL(void) {
 
 @end
 
-#pragma mark - driver: feed the app's delegate
+#pragma mark - driver
 
 @interface CKDriver : NSObject
 @property (nonatomic, weak) id delegate;
@@ -136,6 +177,7 @@ static NSString *CKStreamURL(void) {
     dispatch_source_set_event_handler(self.timer, ^{
         __strong typeof(weakSelf) self = weakSelf;
         if (!self || !self.delegate) return;
+        if (!gEnabled || !gKeyValid) return;
 
         CMSampleBufferRef sb = [[CKSource shared] copySampleBuffer];
         if (!sb) return;
@@ -150,10 +192,8 @@ static NSString *CKStreamURL(void) {
                 }
             } @catch (__unused NSException *e) {}
             [d captureOutput:out didOutputSampleBuffer:sb fromConnection:conn];
-            CFRelease(sb);
-        } else {
-            CFRelease(sb);
         }
+        CFRelease(sb);
     });
     dispatch_resume(self.timer);
 }
@@ -164,7 +204,61 @@ static NSString *CKStreamURL(void) {
         self.timer = nil;
     }
     self.delegate = nil;
-    [[CKSource shared].player pause];
+}
+
+@end
+
+#pragma mark - floating toggle
+
+@interface CKToggleWindow : UIWindow
+@end
+
+@implementation CKToggleWindow
+
+static CKToggleWindow *gToggleWindow = nil;
+
++ (void)install {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        if (gToggleWindow) return;
+        CGRect screen = [UIScreen mainScreen].bounds;
+        gToggleWindow = [[CKToggleWindow alloc] initWithFrame:CGRectMake(screen.size.width - 74, 110, 64, 64)];
+        gToggleWindow.windowLevel = UIWindowLevelAlert + 1;
+        gToggleWindow.backgroundColor = [UIColor clearColor];
+        gToggleWindow.rootViewController = [UIViewController new];
+
+        UIButton *btn = [UIButton buttonWithType:UIButtonTypeCustom];
+        btn.frame = CGRectMake(0, 0, 64, 64);
+        btn.layer.cornerRadius = 32;
+        btn.layer.masksToBounds = YES;
+        btn.titleLabel.font = [UIFont boldSystemFontOfSize:13];
+        [btn setTitle:@"CAM" forState:UIControlStateNormal];
+        [btn addTarget:self action:@selector(toggle:) forControlEvents:UIControlEventTouchUpInside];
+        [gToggleWindow.rootViewController.view addSubview:btn];
+
+        gToggleWindow.hidden = NO;
+        [self refreshButton:btn];
+    });
+}
+
++ (void)refreshButton:(UIButton *)btn {
+    BOOL on = gEnabled && gKeyValid;
+    btn.backgroundColor = on ? [UIColor colorWithRed:0.1 green:0.65 blue:0.3 alpha:0.9]
+                             : [UIColor colorWithRed:0.4 green:0.4 blue:0.45 alpha:0.9];
+}
+
++ (void)toggle:(UIButton *)btn {
+    if (!gKeyValid) {
+        CKCheckKey();
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{ [self refreshButton:btn]; });
+        return;
+    }
+    gEnabled = !gEnabled;
+    CKSetPref(@"enabled", @(gEnabled));
+    [self refreshButton:btn];
+    UIImpactFeedbackGenerator *h = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight];
+    [h impactOccurred];
 }
 
 @end
@@ -190,10 +284,23 @@ static NSString *CKStreamURL(void) {
 - (void)startRunning {
     %orig;
     [[CKSource shared] startIfNeeded];
+    [CKToggleWindow install];
+}
+
+%end
+
+%hook UIApplication
+
+- (void)applicationDidFinishLaunching:(UIApplication *)application {
+    %orig;
+    [CKToggleWindow install];
 }
 
 %end
 
 %ctor {
-    NSLog(@"[ObsCam] loaded · url=%@", CKStreamURL());
+    gEnabled = [CKPref(@"enabled", @"1") boolValue];
+    gKeyValid = [CKPref(@"keyValid", @"1") boolValue];
+    CKCheckKey();
+    NSLog(@"[ObsCam] loaded · url=%@ key=%@", CKStreamURL(), CKKey().length ? @"yes" : @"no");
 }

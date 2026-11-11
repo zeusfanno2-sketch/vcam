@@ -2,17 +2,5 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>Filter</key>
-	<dict>
-		<key>Bundles</key>
-		<array>
-			<string>com.apple.camera</string>
-			<string>com.zhiliaoapp.musically</string>
-			<string>com.facebook.Facebook</string>
-			<string>com.burbn.instagram</string>
-			<string>com.apple.MobileSMS</string>
-			<string>com.toyopagroup.picaboo</string>
-		</array>
-	</dict>
 </dict>
 </plist>

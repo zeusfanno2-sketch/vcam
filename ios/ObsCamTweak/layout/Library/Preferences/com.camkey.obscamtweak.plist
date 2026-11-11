@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>streamURL</key>
+	<string>http://192.168.1.10:8888/live/test/index.m3u8</string>
+	<key>server</key>
+	<string>https://xml-buying-jvc-intro.trycloudflare.com</string>
+	<key>key</key>
+	<string></string>
+	<key>enabled</key>
+	<true/>
+	<key>keyValid</key>
+	<false/>
+</dict>
+</plist>

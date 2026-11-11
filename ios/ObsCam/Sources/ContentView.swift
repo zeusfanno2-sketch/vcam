@@ -21,7 +21,7 @@ final class AppState: ObservableObject {
 
     init() {
         let d = UserDefaults.standard
-        server = d.string(forKey: "server") ?? "https://timeline-fewer-drawing-italiano.trycloudflare.com"
+        server = d.string(forKey: "server") ?? "https://ranch-complicated-commander-pink.trycloudflare.com"
         key = d.string(forKey: "key") ?? ""
         expiresAt = d.double(forKey: "expiresAt")
         deviceName = d.string(forKey: "deviceName") ?? Device.name

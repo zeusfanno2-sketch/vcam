@@ -110,8 +110,6 @@ final class AppState: ObservableObject {
     }
 
     func verifyOnLaunch() async {
-
-    func verifyOnLaunch() async {
         guard !key.isEmpty, expiresAt > Date().timeIntervalSince1970 * 1000 else { return }
         await MainActor.run { unlocked = true }
         guard let url = URL(string: server.trimmingCharacters(in: .whitespaces) + "/api/v1/public/check") else { return }

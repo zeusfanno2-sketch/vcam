@@ -485,7 +485,7 @@ const server = http.createServer(async (req, res) => {
       k.udid = udid;
       k.deviceName = String(b.name || '').slice(0, 60) || null;
       k.activatedAt = now();
-      k.expiresAt = now() + k.days * 864e5;
+      k.expiresAt = k.createdAt + k.days * 864e5;
       save();
     }
     if (k.expiresAt < now()) return json(res, 403, { ok: false, message: 'Key đã hết hạn' });

@@ -3,9 +3,13 @@ name: ios
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - "ios/**"
       - ".github/workflows/ios.yml"
+
+permissions:
+  contents: write
 
 jobs:
   app:
@@ -26,21 +30,26 @@ jobs:
       - name: Package IPA
         working-directory: ios/ObsCam
         run: |
+          rm -rf Payload ObsCam-unsigned.ipa
           mkdir -p Payload
           cp -R build/Build/Products/Release-iphoneos/ObsCam.app Payload/
-          zip -qr ObsCam-unsigned.ipa Payload
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ObsCam-unsigned-ipa
-          path: ios/ObsCam/ObsCam-unsigned.ipa
+          zip -qry ObsCam-unsigned.ipa Payload
+      - name: Publish release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="build-${{ github.run_number }}"
+          gh release create "$TAG" "ios/ObsCam/ObsCam-unsigned.ipa" \
+            --repo "${{ github.repository }}" \
+            --title "Build ${{ github.run_number }}" \
+            --notes "ObsCam unsigned IPA (bundle com.camkey.obscam)."
 
   tweak:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - name: Theos
-        run: |
-          git clone --recursive https://github.com/theos/theos.git $HOME/theos
+        run: git clone --recursive https://github.com/theos/theos.git $HOME/theos
       - name: Dependencies
         run: brew install ldid make
       - name: Build deb
@@ -48,7 +57,11 @@ jobs:
         run: |
           export THEOS=$HOME/theos
           make package FINALPACKAGE=1
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ObsCamTweak-deb
-          path: ios/ObsCamTweak/packages/*.deb
+      - name: Publish deb
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="build-${{ github.run_number }}"
+          gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1 || \
+            gh release create "$TAG" --repo "${{ github.repository }}" --title "Build ${{ github.run_number }}" --notes "-"
+          gh release upload "$TAG" ios/ObsCamTweak/packages/*.deb --repo "${{ github.repository }}" --clobber

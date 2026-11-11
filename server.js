@@ -21,7 +21,8 @@ function load() {
         version: '1.0.0',
         size: '—',
         icon: '',
-        plistUrl: ''
+        plistUrl: '',
+        ipaUrl: ''
       },
       keys: [],
       sessions: []
@@ -205,7 +206,10 @@ function adminPage() {
     </div>
     <div class="row">
       <label class="wide">Icon URL<input id="picon"></label>
-      <label class="wide">Plist URL<input id="pplist"></label>
+      <label class="wide">IPA URL<input id="pipa"></label>
+    </div>
+    <div class="row">
+      <label class="wide">Plist URL (tự sinh nếu để trống)<input id="pplist"></label>
     </div>
     <button class="btn" id="savepkg">Lưu</button>
     <div class="line" id="pmsg"></div>
@@ -273,11 +277,12 @@ async function loadPkg() {
   $('pname').value = p.name || ''; $('pver').value = p.version || '';
   $('pbundle').value = p.bundleId || ''; $('picon').value = p.icon || '';
   $('pplist').value = p.plistUrl || '';
+  $('pipa').value = p.ipaUrl || '';
 }
 $('savepkg').onclick = async () => {
   const r = await api('/admin/package', {
     method: 'POST',
-    body: JSON.stringify({ name: $('pname').value, version: $('pver').value, bundleId: $('pbundle').value, icon: $('picon').value, plistUrl: $('pplist').value })
+    body: JSON.stringify({ name: $('pname').value, version: $('pver').value, bundleId: $('pbundle').value, icon: $('picon').value, plistUrl: $('pplist').value, ipaUrl: $('pipa').value })
   });
   $('pmsg').textContent = r.ok ? 'Đã lưu' : 'Lỗi';
   setTimeout(() => $('pmsg').textContent = '', 2000);
@@ -418,6 +423,7 @@ const server = http.createServer(async (req, res) => {
       bundleId: String(b.bundleId ?? db.pkg.bundleId).slice(0, 120),
       icon: String(b.icon ?? db.pkg.icon).slice(0, 500),
       plistUrl: String(b.plistUrl ?? db.pkg.plistUrl).slice(0, 500),
+      ipaUrl: String(b.ipaUrl ?? db.pkg.ipaUrl).slice(0, 500),
       size: String(b.size ?? db.pkg.size).slice(0, 20)
     };
     save();
@@ -427,7 +433,34 @@ const server = http.createServer(async (req, res) => {
   if (p.startsWith('/api/v1/public/package/')) {
     const slug = p.split('/').pop();
     if (slug !== db.pkg.slug) return json(res, 404, { ok: false });
-    return json(res, 200, { ok: true, package: db.pkg });
+    const proto = String(req.headers['x-forwarded-proto'] || 'http').split(',')[0];
+    const host = req.headers.host;
+    const pkg = { ...db.pkg };
+    if (pkg.ipaUrl) pkg.plistUrl = `${proto}://${host}/plist/${pkg.slug}.plist`;
+    return json(res, 200, { ok: true, package: pkg });
+  }
+
+  if (p.startsWith('/plist/') && p.endsWith('.plist')) {
+    const slug = p.slice(7, -6);
+    if (slug !== db.pkg.slug || !db.pkg.ipaUrl) {
+      res.writeHead(404, { 'content-type': 'text/plain' });
+      return res.end('no package');
+    }
+    const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict><key>items</key><array><dict><key>assets</key><array><dict>
+<key>kind</key><string>software-package</string>
+<key>url</key><string>${esc(db.pkg.ipaUrl)}</string>
+</dict>${db.pkg.icon ? `<dict><key>kind</key><string>display-image</string><key>needs-shine</key><false/><key>url</key><string>${esc(db.pkg.icon)}</string></dict>` : ''}</array>
+<key>metadata</key><dict>
+<key>bundle-identifier</key><string>${esc(db.pkg.bundleId)}</string>
+<key>bundle-version</key><string>${esc(db.pkg.version)}</string>
+<key>kind</key><string>software</string>
+<key>title</key><string>${esc(db.pkg.name)}</string>
+</dict></dict></array></dict></plist>`;
+    res.writeHead(200, { 'content-type': 'application/xml; charset=utf-8', 'cache-control': 'no-store' });
+    return res.end(xml);
   }
 
   if (p === '/api/v1/public/redeem' && req.method === 'POST') {

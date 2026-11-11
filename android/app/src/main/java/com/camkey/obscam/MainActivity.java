@@ -41,8 +41,11 @@ import java.util.concurrent.Executors;
 @OptIn(markerClass = UnstableApi.class)
 public class MainActivity extends AppCompatActivity {
 
-    private static final String DEFAULT_SERVER = "https://alternatives-polar-consultant-meyer.trycloudflare.com";
-    private static final String BOOTSTRAP = "https://raw.githubusercontent.com/zeusfanno2-sketch/vcam/main/server.txt";
+    private static final String DEFAULT_SERVER = "https://xml-buying-jvc-intro.trycloudflare.com";
+    private static final String[] BOOTSTRAP_URLS = {
+            "https://cdn.jsdelivr.net/gh/zeusfanno2-sketch/vcam@main/server.txt",
+            "https://raw.githubusercontent.com/zeusfanno2-sketch/vcam/main/server.txt"
+    };
     private static final String DEFAULT_STREAM = "http://192.168.1.10:8888/live/test/index.m3u8";
 
     private SharedPreferences prefs;
@@ -111,18 +114,21 @@ public class MainActivity extends AppCompatActivity {
 
     private void bootstrapAsync() {
         io.execute(() -> {
-            try {
-                HttpURLConnection c = (HttpURLConnection) new URL(BOOTSTRAP).openConnection();
-                c.setConnectTimeout(8000);
-                c.setReadTimeout(8000);
-                BufferedReader r = new BufferedReader(new InputStreamReader(c.getInputStream(), "UTF-8"));
-                String line = r.readLine();
-                r.close();
-                if (line != null && line.trim().startsWith("http")) {
-                    server = line.trim();
-                    prefs.edit().putString("server", server).apply();
-                }
-            } catch (Exception ignored) { }
+            for (String u : BOOTSTRAP_URLS) {
+                try {
+                    HttpURLConnection c = (HttpURLConnection) new URL(u).openConnection();
+                    c.setConnectTimeout(8000);
+                    c.setReadTimeout(8000);
+                    BufferedReader r = new BufferedReader(new InputStreamReader(c.getInputStream(), "UTF-8"));
+                    String line = r.readLine();
+                    r.close();
+                    if (line != null && line.trim().startsWith("http")) {
+                        server = line.trim();
+                        prefs.edit().putString("server", server).apply();
+                        return;
+                    }
+                } catch (Exception ignored) { }
+            }
         });
     }
 
@@ -295,7 +301,14 @@ public class MainActivity extends AppCompatActivity {
         String line;
         while ((line = r.readLine()) != null) sb.append(line);
         r.close();
-        return new JSONObject(sb.toString());
+        try {
+            return new JSONObject(sb.toString());
+        } catch (Exception e) {
+            JSONObject fallback = new JSONObject();
+            fallback.put("ok", false);
+            fallback.put("message", "HTTP " + code + ": " + sb.toString().substring(0, Math.min(60, sb.length())));
+            return fallback;
+        }
     }
 
     // ---------- player ----------

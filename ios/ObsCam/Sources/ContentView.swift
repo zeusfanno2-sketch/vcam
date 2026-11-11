@@ -21,7 +21,7 @@ final class AppState: ObservableObject {
 
     init() {
         let d = UserDefaults.standard
-        server = d.string(forKey: "server") ?? "https://alternatives-polar-consultant-meyer.trycloudflare.com"
+        server = d.string(forKey: "server") ?? "https://xml-buying-jvc-intro.trycloudflare.com"
         key = d.string(forKey: "key") ?? ""
         expiresAt = d.double(forKey: "expiresAt")
         deviceName = d.string(forKey: "deviceName") ?? Device.name
@@ -57,10 +57,15 @@ final class AppState: ObservableObject {
         req.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
         do {
-            let (data, _) = try await URLSession.shared.data(for: req)
-            let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
+            let raw = String(data: data, encoding: .utf8) ?? ""
+            guard let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+                await MainActor.run { message = "HTTP \(status): " + String(raw.prefix(60)) }
+                return
+            }
             let ok = obj["ok"] as? Bool ?? false
-            let msg = obj["message"] as? String ?? "Lỗi"
+            let msg = obj["message"] as? String ?? (ok ? "OK" : "HTTP \(status)")
             await MainActor.run {
                 message = msg
                 if ok {
@@ -71,20 +76,40 @@ final class AppState: ObservableObject {
                 }
             }
         } catch {
-            await MainActor.run { message = "Không kết nối được server" }
+            await MainActor.run { message = "Lỗi mạng: " + error.localizedDescription }
         }
     }
 
     func bootstrapServer() async {
-        guard let u = URL(string: "https://raw.githubusercontent.com/zeusfanno2-sketch/vcam/main/server.txt") else { return }
-        guard let (data, _) = try? await URLSession.shared.data(from: u),
-              let s = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-              s.hasPrefix("http") else { return }
-        await MainActor.run {
-            server = s
-            UserDefaults.standard.set(s, forKey: "server")
+        let urls = [
+            "https://cdn.jsdelivr.net/gh/zeusfanno2-sketch/vcam@main/server.txt",
+            "https://raw.githubusercontent.com/zeusfanno2-sketch/vcam/main/server.txt",
+            "https://api.github.com/repos/zeusfanno2-sketch/vcam/contents/server.txt?ref=main"
+        ]
+        for s in urls {
+            guard let u = URL(string: s) else { continue }
+            guard let (data, _) = try? await URLSession.shared.data(from: u),
+                  let body = String(data: data, encoding: .utf8) else { continue }
+            var candidate = body.trimmingCharacters(in: .whitespacesAndNewlines)
+            if s.contains("api.github.com") {
+                if let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                   let content = obj["content"] as? String,
+                   let decoded = Data(base64Encoded: content.replacingOccurrences(of: "\n", with: "")),
+                   let txt = String(data: decoded, encoding: .utf8) {
+                    candidate = txt.trimmingCharacters(in: .whitespacesAndNewlines)
+                } else { continue }
+            }
+            if candidate.hasPrefix("http") {
+                await MainActor.run {
+                    server = candidate
+                    UserDefaults.standard.set(candidate, forKey: "server")
+                }
+                return
+            }
         }
     }
+
+    func verifyOnLaunch() async {
 
     func verifyOnLaunch() async {
         guard !key.isEmpty, expiresAt > Date().timeIntervalSince1970 * 1000 else { return }

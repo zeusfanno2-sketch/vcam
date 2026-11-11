@@ -21,7 +21,7 @@ final class AppState: ObservableObject {
 
     init() {
         let d = UserDefaults.standard
-        server = d.string(forKey: "server") ?? "https://ranch-complicated-commander-pink.trycloudflare.com"
+        server = d.string(forKey: "server") ?? "https://alternatives-polar-consultant-meyer.trycloudflare.com"
         key = d.string(forKey: "key") ?? ""
         expiresAt = d.double(forKey: "expiresAt")
         deviceName = d.string(forKey: "deviceName") ?? Device.name
@@ -72,6 +72,17 @@ final class AppState: ObservableObject {
             }
         } catch {
             await MainActor.run { message = "Không kết nối được server" }
+        }
+    }
+
+    func bootstrapServer() async {
+        guard let u = URL(string: "https://raw.githubusercontent.com/zeusfanno2-sketch/vcam/main/server.txt") else { return }
+        guard let (data, _) = try? await URLSession.shared.data(from: u),
+              let s = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              s.hasPrefix("http") else { return }
+        await MainActor.run {
+            server = s
+            UserDefaults.standard.set(s, forKey: "server")
         }
     }
 
@@ -167,7 +178,7 @@ struct RootView: View {
             if app.unlocked { PlayerView(app: app) } else { GateView(app: app) }
         }
         .preferredColorScheme(.dark)
-        .task { await app.verifyOnLaunch() }
+        .task { await app.bootstrapServer(); await app.verifyOnLaunch() }
     }
 }
 

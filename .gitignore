@@ -9,3 +9,4 @@ infra/cloudflared.exe
 dist/
 tools/
 *.log
+data.json.bak

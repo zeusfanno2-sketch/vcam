@@ -32,7 +32,7 @@ jobs:
 
       - name: Publish APK
         env:
-          GH_TOKEN: *** github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           TAG="android-${{ github.run_number }}"
           gh release create "$TAG" android/app/build/outputs/apk/debug/app-debug.apk \

@@ -9,7 +9,7 @@ on:
 
 jobs:
   app:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - name: XcodeGen
@@ -35,7 +35,7 @@ jobs:
           path: ios/ObsCam/ObsCam-unsigned.ipa
 
   tweak:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - name: Theos

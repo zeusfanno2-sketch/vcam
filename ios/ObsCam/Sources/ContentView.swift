@@ -328,6 +328,8 @@ struct InfoView: View {
                 }
                 Section("Kết nối") {
                     row("Stream", streamURL)
+                    row("OBS server", streamURL.replacingOccurrences(of: "http://", with: "rtmp://").replacingOccurrences(of: ":8888", with: ":1935").replacingOccurrences(of: "/index.m3u8", with: ""))
+                    row("OBS key", streamURL.components(separatedBy: "/").dropLast(2).last ?? "test")
                     row("Phiên bản", Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0")
                 }
             }

@@ -381,13 +381,25 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showInfo() {
+        String su = prefs.getString("stream", DEFAULT_STREAM);
+        String ip = "192.168.1.147";
+        String path = "live/test";
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("^https?://([^:/]+)(?::\\d+)?/(.+?)/index\\.m3u8$").matcher(su);
+        if (m.find()) { ip = m.group(1); path = m.group(2); }
+        String rtmp = "rtmp://" + ip + ":1935/" + path;
+        String streamKey = path.contains("/") ? path.substring(path.lastIndexOf('/') + 1) : path;
+
         String s = "Tên: " + deviceName + "\n"
                 + "ID: " + deviceId() + "\n"
                 + "Model: " + android.os.Build.MODEL + "\n\n"
                 + "Key: " + key + "\n"
                 + "Hạn: " + expiryText() + "\n"
                 + "Còn lại: " + daysLeft() + " ngày\n\n"
-                + "Stream: " + prefs.getString("stream", DEFAULT_STREAM) + "\n"
+                + "— OBS —\n"
+                + "Server: " + rtmp + "\n"
+                + "Stream key: " + streamKey + "\n"
+                + "HLS (app): " + su + "\n\n"
                 + "Phiên bản: 1.0.0";
         new AlertDialog.Builder(this)
                 .setTitle("Thông tin")

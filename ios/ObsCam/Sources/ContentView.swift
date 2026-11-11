@@ -182,7 +182,6 @@ struct GateView: View {
                 Text("Nhập key để sử dụng").font(.footnote).foregroundStyle(.secondary)
 
                 field("Key", text: $app.key, caps: .characters, keyboard: .asciiCapable)
-                field("Server", text: $app.server, caps: .never, keyboard: .URL)
 
                 kv("Tên thiết bị", Device.name)
                 kv("ID thiết bị", Device.id)
@@ -294,7 +293,6 @@ struct InfoView: View {
                     row("Còn lại", app.daysLeft.description + " ngày")
                 }
                 Section("Kết nối") {
-                    row("Server", app.server)
                     row("Stream", streamURL)
                     row("Phiên bản", Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0")
                 }

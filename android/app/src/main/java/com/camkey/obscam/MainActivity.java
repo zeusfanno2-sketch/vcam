@@ -132,10 +132,6 @@ public class MainActivity extends AppCompatActivity {
         keyInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
         box.addView(keyInput);
 
-        EditText serverInput = input("Server", server);
-        serverInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        box.addView(serverInput);
-
         box.addView(kv("Tên thiết bị", deviceName()));
         box.addView(kv("ID thiết bị", deviceId()));
         box.addView(kv("Model", android.os.Build.MODEL));
@@ -152,9 +148,7 @@ public class MainActivity extends AppCompatActivity {
         btn.setAllCaps(false);
         btn.setOnClickListener(v -> {
             String k = keyInput.getText().toString().trim().toUpperCase();
-            String s = serverInput.getText().toString().trim();
             if (k.isEmpty()) { msg.setText("Nhập key"); return; }
-            server = s.isEmpty() ? DEFAULT_SERVER : s;
             activate(k, msg, btn);
         });
         box.addView(btn);
@@ -358,7 +352,6 @@ public class MainActivity extends AppCompatActivity {
                 + "Key: " + key + "\n"
                 + "Hạn: " + expiryText() + "\n"
                 + "Còn lại: " + daysLeft() + " ngày\n\n"
-                + "Server: " + server + "\n"
                 + "Stream: " + prefs.getString("stream", DEFAULT_STREAM) + "\n"
                 + "Phiên bản: 1.0.0";
         new AlertDialog.Builder(this)

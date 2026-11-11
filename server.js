@@ -33,7 +33,12 @@ function load() {
   return JSON.parse(fs.readFileSync(DATA, 'utf8'));
 }
 let db = load();
-const save = () => fs.writeFileSync(DATA, JSON.stringify(db, null, 2));
+const save = () => {
+  const tmp = DATA + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(db, null, 2));
+  try { if (fs.existsSync(DATA)) fs.copyFileSync(DATA, DATA + '.bak'); } catch {}
+  fs.renameSync(tmp, DATA);
+};
 
 function newKey() {
   const block = () => Array.from({ length: 4 }, () => ALPHA[crypto.randomInt(ALPHA.length)]).join('');
@@ -105,17 +110,18 @@ function formBody(req) {
 /* ---------- public pages ---------- */
 
 function publicPage() {
+  const apkFile = ['CAMKEY.apk', 'app-debug.apk'].find(f => fs.existsSync(path.join(ROOT, 'dist', f))) || '';
   return `<!doctype html><html lang="vi"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>OBS Cam</title>
-<link rel="stylesheet" href="/style.css"></head>
+<link rel="stylesheet" href="/style.css?v=6"></head>
 <body class="center">
 <main class="card" id="app">
   <div class="icon" id="icon"></div>
   <h1 id="name">…</h1>
   <div class="meta"><span id="ver"></span><span id="size"></span></div>
   <a class="btn" id="install" href="#">Cài đặt</a>
-  ${fs.existsSync(path.join(ROOT, 'dist', 'app-debug.apk')) ? '<a class="btn ghost" href="/files/app-debug.apk">Tải APK (Android)</a>' : ''}
+  ${apkFile ? '<a class="btn ghost" href="/files/' + apkFile + '">Tải APK (Android)</a>' : ''}
   <div class="line" id="msg">Mở app và nhập key sau khi cài</div>
 </main>
 <script>
@@ -154,7 +160,7 @@ function adminPage(authedNow) {
 
 <div id="app" class="wrap"${authedNow ? '' : ' hidden'}>
   <header>
-    <b>CAMKEY</b><span class="muted" style="font-size:11px">v5</span>
+    <b>CAMKEY</b><span class="muted" style="font-size:11px">v6</span>
     <span class="grow"></span>
     <span id="stat" class="muted"></span>
     <button class="btn tiny ghost" id="out">Thoát</button>
@@ -304,25 +310,29 @@ input:focus{outline:none;border-color:var(--acc)}
 .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
 .right{text-align:right}
 .line{font-size:12px;color:var(--mut);min-height:16px;text-align:center}
-table{width:100%;border-collapse:collapse;font-size:13px;table-layout:auto}
-#tbl td:first-child,#tbl th:first-child{width:190px}
-#tbl td:last-child,#tbl th:last-child{width:230px;text-align:right}
+table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+#tbl th:first-child{width:22%}
+#tbl th:nth-child(2){width:10%}
+#tbl th:nth-child(3){width:8%}
+#tbl th:nth-child(4){width:14%}
+#tbl th:last-child{width:19%;text-align:right}
 th{text-align:left;color:var(--mut);font-weight:500;font-size:12px;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
-td{padding:10px;border-bottom:1px solid #1b2130;white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid #1b2130;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nowrap{white-space:nowrap}
 .tablewrap{overflow-x:auto;max-width:100%}
 .badge{font-size:11px;padding:2px 8px;border-radius:20px;border:1px solid currentColor}
 .badge.unused{color:var(--mut)}.badge.active{color:var(--ok)}.badge.expired{color:var(--warn)}.badge.revoked{color:var(--bad)}
 .out{display:none;background:#0e1218;border:1px solid var(--line);border-radius:10px;padding:12px;margin:0;font:12px/1.7 ui-monospace,Consolas,monospace;white-space:pre-wrap;max-height:220px;overflow:auto}
 .out.show{display:block}
-#app .card{min-width:300px;max-width:360px;align-items:stretch}
+body.center #app .card{min-width:300px;max-width:360px;align-items:stretch}
 .icon{width:84px;height:84px;margin:4px auto 0;border-radius:20px;background:#1b2130 center/cover no-repeat}
 .meta{display:flex;gap:10px;justify-content:center;color:var(--mut);font-size:12px}
 .kv{display:flex;flex-direction:column;gap:6px;background:#0e1218;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12px}
 .kv>div{display:flex;justify-content:space-between;gap:10px}
 .kv span{color:var(--mut)}
 .kv b{font-weight:600;text-align:right}
-@media(max-width:640px){.wrap{padding:12px}.card{padding:14px}.col-udid{display:none}table{font-size:12px}th,td{padding:8px 6px}.btn.tiny{padding:5px 8px;font-size:11px}}
+@media(max-width:1200px){.col-udid{display:none}}
+@media(max-width:640px){.wrap{padding:12px}.card{padding:14px}table{font-size:12px}th,td{padding:8px 6px}.btn.tiny{padding:5px 8px;font-size:11px}}
 `;
 
 /* ---------- router ---------- */
@@ -348,7 +358,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (p === '/style.css') {
-    res.writeHead(200, { 'content-type': 'text/css; charset=utf-8', 'cache-control': 'max-age=3600' });
+    res.writeHead(200, { 'content-type': 'text/css; charset=utf-8', 'cache-control': 'no-store, no-cache, must-revalidate, max-age=0' });
     return res.end(CSS);
   }
   if (p === '/' || p === '/admin' || p === '/keys' || p === '/panel') {

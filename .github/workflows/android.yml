@@ -30,12 +30,17 @@ jobs:
         working-directory: android
         run: gradle assembleDebug --no-daemon --stacktrace
 
+      - name: Rename APK
+        run: |
+          mkdir -p out
+          cp android/app/build/outputs/apk/debug/app-debug.apk out/CAMKEY.apk
+
       - name: Publish APK
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="android-${{ github.run_number }}"
-          gh release create "$TAG" android/app/build/outputs/apk/debug/app-debug.apk \
+          gh release create "$TAG" out/CAMKEY.apk \
             --repo "${{ github.repository }}" \
             --title "ObsCam Android ${{ github.run_number }}" \
             --notes "APK debug (bundle com.camkey.obscam)."

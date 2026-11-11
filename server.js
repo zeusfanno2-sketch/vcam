@@ -140,7 +140,7 @@ function adminPage(authedNow) {
 <title>CAMKEY</title><link rel="stylesheet" href="/style.css"></head>
 <body>
 <div id="login" class="center"${authedNow ? ' hidden' : ''}>
-  <form class="card narrow" method="post" action="/keys?v=3">
+  <form class="card narrow" method="post" action="/keys?v=5">
     <h1>CAMKEY</h1>
     <input id="pw" name="p" type="password" placeholder="Mật khẩu" autocomplete="off" autofocus>
     <button class="btn" type="submit">Đăng nhập</button>
@@ -331,7 +331,7 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'content-type': 'text/css; charset=utf-8', 'cache-control': 'max-age=3600' });
     return res.end(CSS);
   }
-  if (p === '/' || p === '/admin' || p === '/keys') {
+  if (p === '/' || p === '/admin' || p === '/keys' || p === '/panel') {
     if (req.method === 'POST') {
       const body = await formBody(req);
       const entered = String(body.get('p') ?? body.get('password') ?? '').trim();

@@ -129,21 +129,21 @@ const $ = id => document.getElementById(id);
 
 /* ---------- admin page ---------- */
 
-function adminPage() {
+function adminPage(authedNow) {
   return `<!doctype html><html lang="vi"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CAMKEY</title><link rel="stylesheet" href="/style.css"></head>
 <body>
-<div id="login" class="center">
-  <form class="card narrow" method="post" action="/keys">
+<div id="login" class="center"${authedNow ? ' hidden' : ''}>
+  <form class="card narrow" method="post" action="/keys?v=3">
     <h1>CAMKEY</h1>
-    <input id="pw" name="password" type="password" placeholder="Mật khẩu" autocomplete="current-password">
+    <input id="pw" name="p" type="password" placeholder="Mật khẩu" autocomplete="off" autofocus>
     <button class="btn" type="submit">Đăng nhập</button>
     <div class="line" id="lerr"></div>
   </form>
 </div>
 
-<div id="app" class="wrap" hidden>
+<div id="app" class="wrap"${authedNow ? '' : ' hidden'}>
   <header>
     <b>CAMKEY</b>
     <span class="grow"></span>
@@ -189,7 +189,7 @@ function adminPage() {
 const $ = id => document.getElementById(id);
 let T = localStorage.getItem('camkey_token') || '';
 
-if (location.search.indexOf('e=1') >= 0) { $('lerr').textContent = 'Sai mật khẩu'; }
+if (location.search.indexOf('e=1') >= 0) { $('lerr').textContent = 'Sai mật khẩu'; $('lerr').style.color = '#f87171'; $('lerr').style.fontWeight = '600'; }
 
 const api = async (p, o = {}) => {
   const r = await fetch('/api/v1' + p, {
@@ -265,6 +265,7 @@ boot();
 
 const CSS = `
 *{box-sizing:border-box}
+[hidden]{display:none !important}
 :root{--bg:#0b0d12;--card:#141821;--line:#242b39;--fg:#e8ecf4;--mut:#8b96ab;--acc:#3b82f6;--ok:#16a34a;--warn:#d97706;--bad:#dc2626}
 html,body{margin:0;height:100%}
 body{background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
@@ -322,8 +323,10 @@ const server = http.createServer(async (req, res) => {
   if (p === '/' || p === '/admin' || p === '/keys') {
     if (req.method === 'POST') {
       const body = await formBody(req);
-      if (String(body.get('password') || '') !== ADMIN_PASSWORD) {
-        res.writeHead(302, { location: '/keys?e=1' });
+      const entered = String(body.get('p') ?? body.get('password') ?? '').trim();
+      if (entered !== ADMIN_PASSWORD) {
+        console.log('[login fail] len=' + entered.length);
+        res.writeHead(302, { location: '/keys?e=1&v=3' });
         return res.end();
       }
       const t = token();
@@ -336,7 +339,7 @@ const server = http.createServer(async (req, res) => {
       });
       return res.end();
     }
-    return html(res, 200, adminPage());
+    return html(res, 200, adminPage(!!authed(req)));
   }
   if (p.startsWith('/p/')) return html(res, 200, publicPage());
 

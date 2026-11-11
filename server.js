@@ -69,7 +69,12 @@ function json(res, code, obj) {
   res.end(body);
 }
 function html(res, code, body) {
-  res.writeHead(code, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+  res.writeHead(code, {
+    'content-type': 'text/html; charset=utf-8',
+    'cache-control': 'no-store, no-cache, must-revalidate, max-age=0',
+    pragma: 'no-cache',
+    expires: '0'
+  });
   res.end(body);
 }
 function readBody(req) {
@@ -145,7 +150,7 @@ function adminPage(authedNow) {
 
 <div id="app" class="wrap"${authedNow ? '' : ' hidden'}>
   <header>
-    <b>CAMKEY</b>
+    <b>CAMKEY</b><span class="muted" style="font-size:11px">v5</span>
     <span class="grow"></span>
     <span id="stat" class="muted"></span>
     <button class="btn tiny ghost" id="out">Thoát</button>
@@ -163,7 +168,9 @@ function adminPage(authedNow) {
 
   <section class="card">
     <div class="row between"><b>Key</b><input id="search" placeholder="Tìm key / UDID"></div>
-    <table id="tbl"><thead><tr><th>Key</th><th>Trạng thái</th><th>UDID</th><th>Hết hạn</th><th></th></tr></thead><tbody></tbody></table>
+    <div class="tablewrap">
+    <table id="tbl"><thead><tr><th>Key</th><th>Trạng thái</th><th class="col-udid">UDID</th><th>Hết hạn</th><th></th></tr></thead><tbody></tbody></table>
+    </div>
   </section>
 
   <section class="card">
@@ -209,7 +216,7 @@ async function refresh() {
   if (!r.ok) return;
   const q = $('search').value.toLowerCase();
   const rows = r.keys.filter(k => !q || k.key.toLowerCase().includes(q) || (k.udid || '').toLowerCase().includes(q));
-  $('tbl').tBodies[0].innerHTML = rows.map(k => '<tr><td class="mono">' + k.key + '</td><td>' + badge(k.state) + '</td><td class="mono muted">' + (k.udid ? k.udid.slice(0, 16) + '…' : '—') + '</td><td class="nowrap">' + fmt(k.expiresAt) + '</td><td class="right nowrap"><button class="btn tiny ghost" data-copy="' + k.key + '">Copy</button> ' + (k.state === 'revoked' ? '' : '<button class="btn tiny warn" data-rev="' + k.key + '">Thu hồi</button> ') + '<button class="btn tiny danger" data-del="' + k.key + '">Xóa</button></td></tr>').join('');
+  $('tbl').tBodies[0].innerHTML = rows.map(k => '<tr><td class="mono">' + k.key + '</td><td>' + badge(k.state) + '</td><td class="mono muted col-udid">' + (k.udid ? k.udid.slice(0, 16) + '…' : '—') + '</td><td class="nowrap">' + fmt(k.expiresAt) + '</td><td class="right nowrap"><button class="btn tiny ghost" data-copy="' + k.key + '">Copy</button> ' + (k.state === 'revoked' ? '' : '<button class="btn tiny warn" data-rev="' + k.key + '">Thu hồi</button> ') + '<button class="btn tiny danger" data-del="' + k.key + '">Xóa</button></td></tr>').join('');
   const s = r.stats;
   $('stat').textContent = s.total + ' key · ' + s.active + ' active · ' + s.unused + ' chưa dùng';
 }
@@ -297,6 +304,7 @@ table{width:100%;border-collapse:collapse;font-size:13px;table-layout:auto}
 th{text-align:left;color:var(--mut);font-weight:500;font-size:12px;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
 td{padding:10px;border-bottom:1px solid #1b2130;white-space:nowrap}
 .nowrap{white-space:nowrap}
+.tablewrap{overflow-x:auto;max-width:100%}
 .badge{font-size:11px;padding:2px 8px;border-radius:20px;border:1px solid currentColor}
 .badge.unused{color:var(--mut)}.badge.active{color:var(--ok)}.badge.expired{color:var(--warn)}.badge.revoked{color:var(--bad)}
 .out{display:none;background:#0e1218;border:1px solid var(--line);border-radius:10px;padding:12px;margin:0;font:12px/1.7 ui-monospace,Consolas,monospace;white-space:pre-wrap;max-height:220px;overflow:auto}
@@ -308,7 +316,7 @@ td{padding:10px;border-bottom:1px solid #1b2130;white-space:nowrap}
 .kv>div{display:flex;justify-content:space-between;gap:10px}
 .kv span{color:var(--mut)}
 .kv b{font-weight:600;text-align:right}
-@media(max-width:640px){.wrap{padding:12px}.card{padding:14px}}
+@media(max-width:640px){.wrap{padding:12px}.card{padding:14px}.col-udid{display:none}table{font-size:12px}th,td{padding:8px 6px}.btn.tiny{padding:5px 8px;font-size:11px}}
 `;
 
 /* ---------- router ---------- */

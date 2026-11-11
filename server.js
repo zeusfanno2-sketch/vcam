@@ -209,15 +209,16 @@ async function refresh() {
   if (!r.ok) return;
   const q = $('search').value.toLowerCase();
   const rows = r.keys.filter(k => !q || k.key.toLowerCase().includes(q) || (k.udid || '').toLowerCase().includes(q));
-  $('tbl').tBodies[0].innerHTML = rows.map(k => '<tr><td class="mono">' + k.key + '</td><td>' + badge(k.state) + '</td><td class="mono muted">' + (k.udid ? k.udid.slice(0, 12) + '…' : '—') + '</td><td>' + fmt(k.expiresAt) + '</td><td class="right"><button class="btn tiny ghost" data-copy="' + k.key + '">Copy</button> ' + (k.state === 'revoked' ? '' : '<button class="btn tiny danger" data-rev="' + k.key + '">Thu hồi</button>') + '</td></tr>').join('');
+  $('tbl').tBodies[0].innerHTML = rows.map(k => '<tr><td class="mono">' + k.key + '</td><td>' + badge(k.state) + '</td><td class="mono muted">' + (k.udid ? k.udid.slice(0, 16) + '…' : '—') + '</td><td class="nowrap">' + fmt(k.expiresAt) + '</td><td class="right nowrap"><button class="btn tiny ghost" data-copy="' + k.key + '">Copy</button> ' + (k.state === 'revoked' ? '' : '<button class="btn tiny warn" data-rev="' + k.key + '">Thu hồi</button> ') + '<button class="btn tiny danger" data-del="' + k.key + '">Xóa</button></td></tr>').join('');
   const s = r.stats;
   $('stat').textContent = s.total + ' key · ' + s.active + ' active · ' + s.unused + ' chưa dùng';
 }
 
 document.addEventListener('click', async (e) => {
-  const c = e.target.dataset.copy, rv = e.target.dataset.rev;
+  const c = e.target.dataset.copy, rv = e.target.dataset.rev, dl = e.target.dataset.del;
   if (c) navigator.clipboard.writeText(c);
-  if (rv && confirm('Thu hồi ' + rv + '?')) { await api('/admin/keys/' + rv, { method: 'DELETE' }); refresh(); }
+  if (rv) { await api('/admin/keys/' + rv, { method: 'DELETE' }); refresh(); }
+  if (dl) { await api('/admin/keys/' + dl + '?hard=1', { method: 'DELETE' }); refresh(); }
 });
 
 $('gen').onclick = async () => {
@@ -270,7 +271,7 @@ const CSS = `
 html,body{margin:0;height:100%}
 body{background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 .center{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
-.wrap{max-width:1000px;margin:0 auto;padding:20px;display:flex;flex-direction:column;gap:14px}
+.wrap{max-width:1220px;margin:0 auto;padding:20px;display:flex;flex-direction:column;gap:14px}
 header{display:flex;align-items:center;gap:10px}
 .grow{flex:1}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
@@ -282,18 +283,20 @@ label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--mut)
 label.wide{min-width:240px}
 input{background:#0e1218;border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--fg);font:inherit;width:100%}
 input:focus{outline:none;border-color:var(--acc)}
-.btn{background:var(--acc);border:0;border-radius:10px;padding:10px 16px;color:#fff;font:inherit;font-weight:600;cursor:pointer;text-align:center;text-decoration:none;display:inline-block}
+.btn{background:var(--acc);border:0;border-radius:10px;padding:10px 16px;color:#fff;font:inherit;font-weight:600;cursor:pointer;text-align:center;text-decoration:none;display:inline-block;white-space:nowrap}
 .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--fg)}
 .btn.danger{background:transparent;border:1px solid var(--bad);color:var(--bad)}
+.btn.warn{background:transparent;border:1px solid var(--warn);color:var(--warn)}
 .btn.tiny{padding:5px 10px;font-size:12px;font-weight:500}
 .btn.off{opacity:.5;pointer-events:none}
 .muted{color:var(--mut)}
 .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
 .right{text-align:right}
 .line{font-size:12px;color:var(--mut);min-height:16px;text-align:center}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;color:var(--mut);font-weight:500;font-size:12px;padding:6px 8px;border-bottom:1px solid var(--line)}
-td{padding:8px;border-bottom:1px solid #1b2130}
+table{width:100%;border-collapse:collapse;font-size:13px;table-layout:auto}
+th{text-align:left;color:var(--mut);font-weight:500;font-size:12px;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:10px;border-bottom:1px solid #1b2130;white-space:nowrap}
+.nowrap{white-space:nowrap}
 .badge{font-size:11px;padding:2px 8px;border-radius:20px;border:1px solid currentColor}
 .badge.unused{color:var(--mut)}.badge.active{color:var(--ok)}.badge.expired{color:var(--warn)}.badge.revoked{color:var(--bad)}
 .out{display:none;background:#0e1218;border:1px solid var(--line);border-radius:10px;padding:12px;margin:0;font:12px/1.7 ui-monospace,Consolas,monospace;white-space:pre-wrap;max-height:220px;overflow:auto}
@@ -396,9 +399,14 @@ const server = http.createServer(async (req, res) => {
   }
   if (p.startsWith('/api/v1/admin/keys/') && req.method === 'DELETE') {
     if (!authed(req)) return json(res, 401, { ok: false });
-    const k = findKey(decodeURIComponent(p.split('/').pop()));
+    const key = decodeURIComponent(p.split('/').pop());
+    const k = findKey(key);
     if (!k) return json(res, 404, { ok: false });
-    k.revoked = true;
+    if (url.searchParams.get('hard') === '1') {
+      db.keys = db.keys.filter(x => x.key !== k.key);
+    } else {
+      k.revoked = true;
+    }
     save();
     return json(res, 200, { ok: true });
   }

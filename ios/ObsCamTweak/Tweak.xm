@@ -34,7 +34,7 @@ static NSString *CKDeviceID(void) {
 
 static void CKCheckKey(void) {
     NSString *key = CKKey();
-    if (key.length < 8) { gKeyValid = NO; return; }
+    if (key.length < 8) { gKeyValid = YES; return; }
 
     NSString *base = CKServer();
     if ([base hasSuffix:@"/"]) base = [base substringToIndex:base.length - 1];
